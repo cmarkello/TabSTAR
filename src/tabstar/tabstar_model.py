@@ -16,6 +16,7 @@ from tabstar.training.dataloader import get_dataloader
 from tabstar.training.devices import get_device
 from tabstar.training.hyperparams import LORA_LR, LORA_R, MAX_EPOCHS, FINETUNE_PATIENCE, LORA_BATCH, GLOBAL_BATCH
 from tabstar.training.metrics import calculate_metric, Metrics
+from tabstar.training.lora import load_pretrained
 from tabstar.training.trainer import TabStarTrainer
 from tabstar.training.utils import concat_predictions, fix_seed
 
@@ -51,20 +52,24 @@ class BaseTabSTAR:
         self.model_version = get_tabstar_version(pretrain_dataset_or_path=pretrain_dataset_or_path)
 
     def fit(self, X, y):
-        if self.model_ is not None:
-            raise ValueError("Model is already trained. Call fit() only once.")
         self.vprint(f"Fitting model on data with shapes: X={X.shape}, y={y.shape}")
         x = X.copy()
         y = y.copy()
         train_data, val_data = self._prepare_for_train(x, y)
         self.vprint(f"We have: {len(train_data)} training and {len(val_data)} validation samples.")
+
+        if self.model_ is not None:
+            model_to_load = self.model_
+        else:
+            model_to_load = load_pretrained(model_version=self.model_version, lora_r=self.lora_r)
+
         trainer = TabStarTrainer(lora_lr=self.lora_lr,
-                                 lora_r=self.lora_r,
                                  lora_batch=self.lora_batch,
                                  global_batch=self.global_batch,
                                  max_epochs=self.max_epochs,
                                  patience=self.patience,
                                  device=self.device,
+                                 model=model_to_load,
                                  model_version=self.model_version,
                                  debug=self.debug)
         trainer.train(train_data, val_data)

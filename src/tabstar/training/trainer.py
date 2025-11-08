@@ -28,8 +28,8 @@ if hasattr(torch, 'set_float32_matmul_precision'):
 
 class TabStarTrainer:
 
-    def __init__(self, max_epochs: int, lora_lr: float, lora_r: int, lora_batch: int, patience: int,
-                 global_batch: int, device: torch.device, model_version: str, debug: bool = False):
+    def __init__(self, max_epochs: int, lora_lr: float, lora_batch: int, patience: int,
+                 global_batch: int, device: torch.device, model_version: str, model: PeftModel, debug: bool = False):
         self.lora_lr = lora_lr
         self.lora_batch = lora_batch
         self.global_batch = global_batch
@@ -38,7 +38,7 @@ class TabStarTrainer:
         self.device = device
         self.debug = debug
         self.model_version = model_version
-        self.model = load_pretrained(model_version=model_version, lora_r=lora_r)
+        self.model = model
         self.model.to(self.device)
         self.optimizer = get_optimizer(model=self.model, lr=self.lora_lr)
         self.scheduler = get_scheduler(optimizer=self.optimizer, max_lr=self.lora_lr, epochs=self.max_epochs)
@@ -75,6 +75,7 @@ class TabStarTrainer:
         total_loss = 0.0
         total_samples = 0
         for data in tqdm(dataloader, desc="Batches", leave=False):
+            #print(f"DEBUG data from _train_epoch: {data}")
             batch_loss = self._train_batch(data)
             total_loss += batch_loss * len(data.y)
             total_samples += len(data.y)
@@ -89,6 +90,7 @@ class TabStarTrainer:
         return epoch_loss
 
     def _train_batch(self, data: TabSTARData) -> float:
+        #print(f"DEBUG data: {data}")
         with autocast(device_type=self.device.type, enabled=self.use_amp):
             loss, predictions = self._do_forward(data=data)
             loss_for_backward = loss / self.accumulation_steps
