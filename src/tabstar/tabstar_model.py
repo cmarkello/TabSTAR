@@ -29,6 +29,7 @@ class BaseTabSTAR:
                  global_batch: int = GLOBAL_BATCH,
                  max_epochs: int = MAX_EPOCHS,
                  patience: int = FINETUNE_PATIENCE,
+                 val_ratio: float = 0.1,
                  verbose: bool = False,
                  device: Optional[Union[str,  torch.device]] = None,
                  random_state: Optional[int] = None,
@@ -40,6 +41,7 @@ class BaseTabSTAR:
         self.global_batch = global_batch
         self.max_epochs = max_epochs
         self.patience = patience
+        self.val_ratio = val_ratio
         self.verbose = verbose
         self.debug = debug
         self.preprocessor_: Optional[TabSTARVerbalizer] = None
@@ -96,7 +98,7 @@ class BaseTabSTAR:
             raise ValueError("y must be a pandas Series.")
         raise_if_null_target(y)
         self.vprint(f"Preparing data for training. X shape: {X.shape}, y shape: {y.shape}")
-        x_train, x_val, y_train, y_val = split_to_val(x=X, y=y, is_cls=self.is_cls)
+        x_train, x_val, y_train, y_val = split_to_val(x=X, y=y, val_ratio=self.val_ratio, is_cls=self.is_cls)
         self.vprint(f"Split to validation set. Train has {len(x_train)} samples, validation has {len(x_val)} samples.")
         if self.preprocessor_ is None:
             self.preprocessor_ = TabSTARVerbalizer(is_cls=self.is_cls, verbose=self.verbose)
