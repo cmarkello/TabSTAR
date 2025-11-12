@@ -1,7 +1,9 @@
 from typing import Optional, Tuple, Union
 
+import datetime
 import joblib
 import numpy as np
+import os
 import torch
 from pandas import Series, DataFrame
 from peft import PeftModel
@@ -16,7 +18,7 @@ from tabstar.training.dataloader import get_dataloader
 from tabstar.training.devices import get_device
 from tabstar.training.hyperparams import LORA_LR, LORA_R, MAX_EPOCHS, FINETUNE_PATIENCE, LORA_BATCH, GLOBAL_BATCH
 from tabstar.training.metrics import calculate_metric, Metrics
-from tabstar.training.lora import load_pretrained
+from tabstar.training.lora import load_pretrained, load_finetuned
 from tabstar.training.trainer import TabStarTrainer
 from tabstar.training.utils import concat_predictions, fix_seed
 
@@ -46,6 +48,8 @@ class BaseTabSTAR:
         self.debug = debug
         self.preprocessor_: Optional[TabSTARVerbalizer] = None
         self.model_: Optional[PeftModel] = None
+        self.load_dir: str = None
+        self.save_dir: str = os.path.join(".tabstar_checkpoint/", datetime.datetime.now().strftime("%Y%m%d_%H%M%S"))
         self.random_state = random_state
         fix_seed(seed=self.random_state)
         self.device = get_device(device=device)
@@ -60,11 +64,11 @@ class BaseTabSTAR:
         train_data, val_data = self._prepare_for_train(x, y)
         self.vprint(f"We have: {len(train_data)} training and {len(val_data)} validation samples.")
 
-        if self.model_ is not None:
-            model_to_load = self.model_
+        if self.load_dir is not None:
+            model_to_load = load_finetuned(self.load_dir, tabstar_version=self.model_version, is_trainable=True)
         else:
             model_to_load = load_pretrained(model_version=self.model_version, lora_r=self.lora_r)
-
+        print(f'DEBUG in model fit model_to_load: {model_to_load}')
         trainer = TabStarTrainer(lora_lr=self.lora_lr,
                                  lora_batch=self.lora_batch,
                                  global_batch=self.global_batch,
@@ -74,8 +78,10 @@ class BaseTabSTAR:
                                  model=model_to_load,
                                  model_version=self.model_version,
                                  debug=self.debug)
+        trainer.save_dir = self.save_dir
         trainer.train(train_data, val_data)
         self.model_ = trainer.load_model()
+        print(f'DEBUG END OF TRAINING in model fit self.model_: {self.model_}')
 
     def predict(self, X):
         raise NotImplementedError("Must be implemented in subclass")
@@ -103,6 +109,8 @@ class BaseTabSTAR:
         if self.preprocessor_ is None:
             self.preprocessor_ = TabSTARVerbalizer(is_cls=self.is_cls, verbose=self.verbose)
             self.preprocessor_.fit(x_train, y_train)
+        print(f"DEBUG in _prepare_for_train x_train: {x_train}")
+        print(f"DEBUG in _prepare_for_train y_train: {y_train}")
         train_data = self.preprocessor_.transform(x_train, y_train)
         self.vprint(f"Transformed training data: {train_data.x_txt.shape=}, x_num shape: {train_data.x_num.shape=}")
         val_data = self.preprocessor_.transform(x_val, y_val)
