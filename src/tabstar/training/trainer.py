@@ -75,7 +75,6 @@ class TabStarTrainer:
         total_loss = 0.0
         total_samples = 0
         for data in tqdm(dataloader, desc="Batches", leave=False):
-            #print(f"DEBUG data from _train_epoch: {data}")
             batch_loss = self._train_batch(data)
             total_loss += batch_loss * len(data.y)
             total_samples += len(data.y)
@@ -90,7 +89,6 @@ class TabStarTrainer:
         return epoch_loss
 
     def _train_batch(self, data: TabSTARData) -> float:
-        #print(f"DEBUG data: {data}")
         with autocast(device_type=self.device.type, enabled=self.use_amp):
             loss, predictions = self._do_forward(data=data)
             loss_for_backward = loss / self.accumulation_steps

@@ -87,9 +87,6 @@ class TabSTARVerbalizer:
         x = x.drop(columns=self.constant_columns, errors='ignore')
         x = prepend_target_tokens(x=x, y_name=self.y_name, y_values=self.y_values)
         text_cols = [col for col in x.columns if col not in num_cols]
-        print(f'DEBUG in transform x.columns: {x.columns}')
-        print(f'DEBUG in transform num_cols: {num_cols}')
-        print(f'DEBUG in transform text_cols: {text_cols}')
         x_txt = x[text_cols + num_cols].copy()
         # x_num will hold the numerical features transformed to z-scores, and zero otherwise
         x_num = np.zeros(shape=x.shape, dtype=np.float32)

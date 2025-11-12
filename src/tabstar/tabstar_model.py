@@ -68,7 +68,6 @@ class BaseTabSTAR:
             model_to_load = load_finetuned(self.load_dir, tabstar_version=self.model_version, is_trainable=True)
         else:
             model_to_load = load_pretrained(model_version=self.model_version, lora_r=self.lora_r)
-        print(f'DEBUG in model fit model_to_load: {model_to_load}')
         trainer = TabStarTrainer(lora_lr=self.lora_lr,
                                  lora_batch=self.lora_batch,
                                  global_batch=self.global_batch,
@@ -81,7 +80,6 @@ class BaseTabSTAR:
         trainer.save_dir = self.save_dir
         trainer.train(train_data, val_data)
         self.model_ = trainer.load_model()
-        print(f'DEBUG END OF TRAINING in model fit self.model_: {self.model_}')
 
     def predict(self, X):
         raise NotImplementedError("Must be implemented in subclass")
@@ -109,8 +107,6 @@ class BaseTabSTAR:
         if self.preprocessor_ is None:
             self.preprocessor_ = TabSTARVerbalizer(is_cls=self.is_cls, verbose=self.verbose)
             self.preprocessor_.fit(x_train, y_train)
-        print(f"DEBUG in _prepare_for_train x_train: {x_train}")
-        print(f"DEBUG in _prepare_for_train y_train: {y_train}")
         train_data = self.preprocessor_.transform(x_train, y_train)
         self.vprint(f"Transformed training data: {train_data.x_txt.shape=}, x_num shape: {train_data.x_num.shape=}")
         val_data = self.preprocessor_.transform(x_val, y_val)
