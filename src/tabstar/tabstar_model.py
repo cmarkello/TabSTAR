@@ -48,7 +48,7 @@ class BaseTabSTAR:
         self.debug = debug
         self.preprocessor_: Optional[TabSTARVerbalizer] = None
         self.model_: Optional[PeftModel] = None
-        self.load_dir: str = None
+        self.load_dir: Optional[str] = None
         self.save_dir: str = os.path.join(".tabstar_checkpoint/", datetime.datetime.now().strftime("%Y%m%d_%H%M%S"))
         self.random_state = random_state
         fix_seed(seed=self.random_state)
@@ -65,7 +65,7 @@ class BaseTabSTAR:
         self.vprint(f"We have: {len(train_data)} training and {len(val_data)} validation samples.")
 
         if self.load_dir is not None:
-            model_to_load = load_finetuned(self.load_dir, tabstar_version=self.model_version, is_trainable=True)
+            model_to_load = load_finetuned(save_dir=self.load_dir, tabstar_version=self.model_version, is_trainable=True)
         else:
             model_to_load = load_pretrained(model_version=self.model_version, lora_r=self.lora_r)
         trainer = TabStarTrainer(lora_lr=self.lora_lr,

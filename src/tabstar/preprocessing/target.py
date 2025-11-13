@@ -30,6 +30,7 @@ def fit_preprocess_y(y: Series, is_cls: bool) -> Union[LabelEncoder, StandardSca
 def fit_cls_y(y: Series) -> LabelEncoder:
     label_encoder = LabelEncoder()
     label_encoder.fit(y)
+    label_encoder.classes_ = np.array([0, 1])
     return label_encoder
 
 def fit_reg_y(y: Series) -> StandardScaler:
