@@ -1,7 +1,9 @@
 from typing import Optional, Tuple, Union
 
+import datetime
 import joblib
 import numpy as np
+import os
 import torch
 from pandas import Series, DataFrame
 from peft import PeftModel
@@ -16,6 +18,7 @@ from tabstar.training.dataloader import get_dataloader
 from tabstar.training.devices import get_device
 from tabstar.training.hyperparams import LORA_LR, LORA_R, MAX_EPOCHS, FINETUNE_PATIENCE, LORA_BATCH, GLOBAL_BATCH
 from tabstar.training.metrics import calculate_metric, Metrics
+from tabstar.training.lora import load_pretrained, load_finetuned
 from tabstar.training.trainer import TabStarTrainer
 from tabstar.training.utils import concat_predictions, fix_seed
 
@@ -28,6 +31,7 @@ class BaseTabSTAR:
                  global_batch: int = GLOBAL_BATCH,
                  max_epochs: int = MAX_EPOCHS,
                  patience: int = FINETUNE_PATIENCE,
+                 val_ratio: float = 0.1,
                  verbose: bool = False,
                  device: Optional[Union[str,  torch.device]] = None,
                  random_state: Optional[int] = None,
@@ -39,10 +43,13 @@ class BaseTabSTAR:
         self.global_batch = global_batch
         self.max_epochs = max_epochs
         self.patience = patience
+        self.val_ratio = val_ratio
         self.verbose = verbose
         self.debug = debug
         self.preprocessor_: Optional[TabSTARVerbalizer] = None
         self.model_: Optional[PeftModel] = None
+        self.load_dir: Optional[str] = None
+        self.save_dir: str = os.path.join(".tabstar_checkpoint/", datetime.datetime.now().strftime("%Y%m%d_%H%M%S"))
         self.random_state = random_state
         fix_seed(seed=self.random_state)
         self.device = get_device(device=device)
@@ -51,22 +58,26 @@ class BaseTabSTAR:
         self.model_version = get_tabstar_version(pretrain_dataset_or_path=pretrain_dataset_or_path)
 
     def fit(self, X, y):
-        if self.model_ is not None:
-            raise ValueError("Model is already trained. Call fit() only once.")
         self.vprint(f"Fitting model on data with shapes: X={X.shape}, y={y.shape}")
         x = X.copy()
         y = y.copy()
         train_data, val_data = self._prepare_for_train(x, y)
         self.vprint(f"We have: {len(train_data)} training and {len(val_data)} validation samples.")
+
+        if self.load_dir is not None:
+            model_to_load = load_finetuned(save_dir=self.load_dir, tabstar_version=self.model_version, is_trainable=True)
+        else:
+            model_to_load = load_pretrained(model_version=self.model_version, lora_r=self.lora_r)
         trainer = TabStarTrainer(lora_lr=self.lora_lr,
-                                 lora_r=self.lora_r,
                                  lora_batch=self.lora_batch,
                                  global_batch=self.global_batch,
                                  max_epochs=self.max_epochs,
                                  patience=self.patience,
                                  device=self.device,
+                                 model=model_to_load,
                                  model_version=self.model_version,
                                  debug=self.debug)
+        trainer.save_dir = self.save_dir
         trainer.train(train_data, val_data)
         self.model_ = trainer.load_model()
 
@@ -91,7 +102,7 @@ class BaseTabSTAR:
             raise ValueError("y must be a pandas Series.")
         raise_if_null_target(y)
         self.vprint(f"Preparing data for training. X shape: {X.shape}, y shape: {y.shape}")
-        x_train, x_val, y_train, y_val = split_to_val(x=X, y=y, is_cls=self.is_cls)
+        x_train, x_val, y_train, y_val = split_to_val(x=X, y=y, val_ratio=self.val_ratio, is_cls=self.is_cls)
         self.vprint(f"Split to validation set. Train has {len(x_train)} samples, validation has {len(x_val)} samples.")
         if self.preprocessor_ is None:
             self.preprocessor_ = TabSTARVerbalizer(is_cls=self.is_cls, verbose=self.verbose)
